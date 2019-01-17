@@ -6,9 +6,16 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/mux"
 )
 
 var testString = "yeah, buddy"
+var baseURL = "https://hacker-news.firebaseio.com/v0"
+
+func fmtURL(s string) string {
+	return baseURL + "/item/" + s + ".json?print=pretty"
+}
 
 func sayHello(w http.ResponseWriter, r *http.Request) {
 	message := r.URL.Path
@@ -51,7 +58,7 @@ func fmtRes(url string) string {
 
 // Get all of the new news items
 func getNewsItems() []string {
-	url := "https://hacker-news.firebaseio.com/v0/newstories.json"
+	url := baseURL + "/newstories.json"
 	body := fmtRes(url)
 	storyIds := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(string(body)), "["), "]")
 	idSlice := strings.Split(storyIds, ",")
@@ -63,7 +70,7 @@ func filterStories(ids []string) []map[string]interface{} {
 	var s []map[string]interface{}
 
 	for i := 0; i < len(ids); i++ {
-		url := "https://hacker-news.firebaseio.com/v0/item/" + ids[i] + ".json?print=pretty"
+		url := fmtURL(ids[i])
 		body := fmtRes(url)
 		byt := []byte(body)
 		var dat map[string]interface{}
@@ -83,28 +90,37 @@ func getNews(w http.ResponseWriter, r *http.Request) {
 
 	ids := getNewsItems()
 	stories := filterStories(ids)
-	// fmt.Println("item", item)
-
-	// newest := getNewsItems()[0]
-	// // https://hacker-news.firebaseio.com/v0/item/192327.json?print=pretty
-	// url := "https://hacker-news.firebaseio.com/v0/item/" + newest + ".json?print=pretty"
-	// body := fmtRes(url)
 
 	fmt.Println("stories", stories[0])
-
 }
 
 func getStory(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("url", r.URL.Path)
+	id := mux.Vars(r)["id"]
+	storyURL := fmtURL(id)
+	data := fmtRes(storyURL)
+
+	fmt.Println("vars", data)
 }
 
 func main() {
-	http.Handle("/", http.FileServer(http.Dir("./public")))
-	http.HandleFunc("/writename", sayHello)
-	http.HandleFunc("/addnums/*", formatNums)
-	http.HandleFunc("/news", getNews)
-	http.HandleFunc("/news/*", getStory)
+
+	rtr := mux.NewRouter()
+	rtr.HandleFunc("/writename", sayHello)
+	rtr.HandleFunc("/addnums/*", formatNums)
+	rtr.HandleFunc("/news", getNews)
+	rtr.HandleFunc("/story/{id}", getStory)
+	http.Handle("/", rtr)
+
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic(err)
 	}
+
+	// http.Handle("/", http.FileServer(http.Dir("./public")))
+	// http.HandleFunc("/writename", sayHello)
+	// http.HandleFunc("/addnums/*", formatNums)
+	// http.HandleFunc("/news", getNews)
+	// http.HandleFunc("/story*", getStory)
+	// if err := http.ListenAndServe(":8080", nil); err != nil {
+	// 	panic(err)
+	// }
 }
