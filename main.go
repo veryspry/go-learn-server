@@ -10,40 +10,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var testString = "yeah, buddy"
 var baseURL = "https://hacker-news.firebaseio.com/v0"
 
+// Format a URL to make a request to the hacker news api
 func fmtURL(s string) string {
 	return baseURL + "/item/" + s + ".json?print=pretty"
 }
 
-func sayHello(w http.ResponseWriter, r *http.Request) {
-	message := r.URL.Path
-	fmt.Println("http.Request is here:", r.URL)
-	message = strings.TrimPrefix(message, "/")
-	message = "Hello " + message
-	w.Write([]byte(message))
-}
-
-func formatNums(w http.ResponseWriter, r *http.Request) {
-	nums := r.URL.Path
-	nums = strings.TrimPrefix(nums, "/addnums/")
-	w.Write([]byte(nums))
-}
-
-func printShit() {
-	var s = "hello"
-	fmt.Println(s)
-	s = "goodbye"
-	fmt.Println(s)
-	var p = &s
-	*p = "yaassss"
-	fmt.Println(s)
-	s = "whoa"
-	fmt.Println(s)
-}
-
-// Get and format http response body
+// Make an http GET request and format the response body
 func fmtRes(url string) string {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -54,15 +28,6 @@ func fmtRes(url string) string {
 		panic(err)
 	}
 	return string(body)
-}
-
-// Get all of the new news items
-func getNewsItems() []string {
-	url := baseURL + "/newstories.json"
-	body := fmtRes(url)
-	storyIds := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(string(body)), "["), "]")
-	idSlice := strings.Split(storyIds, ",")
-	return idSlice
 }
 
 // Filter anything that doesn't have type field == "story"
@@ -81,46 +46,62 @@ func filterStories(ids []string) []map[string]interface{} {
 			s = append(s, dat)
 		}
 	}
-	// fmt.Println(dat["type"])
 	return s
 }
 
-// Get all stories
-func getNews(w http.ResponseWriter, r *http.Request) {
-
-	ids := getNewsItems()
-	stories := filterStories(ids)
-
-	fmt.Println("stories", stories[0])
+// Get all of the new news item ids
+func getNewsItems() []string {
+	url := baseURL + "/newstories.json"
+	body := fmtRes(url)
+	storyIds := strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(string(body)), "["), "]")
+	idSlice := strings.Split(storyIds, ",")
+	return idSlice
 }
 
+// Get all stories
+// Should return a json response
+func getStories(w http.ResponseWriter, r *http.Request) {
+	// get all of the story id
+	ids := getNewsItems()
+	// filter out anything that isn't a story
+	// Not sure this is going to be a necessary step
+	stories := filterStories(ids)
+
+	for i := 0; i < len(stories); i++ {
+		byt, err := json.Marshal(stories[i])
+		if err != nil {
+			panic(err)
+		}
+		// fmt.Println("stories", byt)
+		w.Write(byt)
+	}
+
+	// w.Write([]byte(stories))
+}
+
+// GET a single story by id read from url parameter
+// Should return a json response
 func getStory(w http.ResponseWriter, r *http.Request) {
+	// read the id
 	id := mux.Vars(r)["id"]
+	// format the url
 	storyURL := fmtURL(id)
+	// Make request and get response body
 	data := fmtRes(storyURL)
 
 	fmt.Println("vars", data)
+
+	w.Write([]byte(data))
 }
 
 func main() {
 
 	rtr := mux.NewRouter()
-	rtr.HandleFunc("/writename", sayHello)
-	rtr.HandleFunc("/addnums/*", formatNums)
-	rtr.HandleFunc("/news", getNews)
+	rtr.HandleFunc("/news", getStories)
 	rtr.HandleFunc("/story/{id}", getStory)
 	http.Handle("/", rtr)
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic(err)
 	}
-
-	// http.Handle("/", http.FileServer(http.Dir("./public")))
-	// http.HandleFunc("/writename", sayHello)
-	// http.HandleFunc("/addnums/*", formatNums)
-	// http.HandleFunc("/news", getNews)
-	// http.HandleFunc("/story*", getStory)
-	// if err := http.ListenAndServe(":8080", nil); err != nil {
-	// 	panic(err)
-	// }
 }
