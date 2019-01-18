@@ -45,6 +45,8 @@ func filterStories(ids []string) []map[string]interface{} {
 		if dat["type"] == "story" {
 			s = append(s, dat)
 		}
+		fmt.Println("finished number:", i)
+		fmt.Println("data:", body)
 	}
 	return s
 }
@@ -58,7 +60,7 @@ func getNewsItems() []string {
 	return idSlice
 }
 
-// Get all stories
+// GET all stories
 // Should return a json response
 func getStories(w http.ResponseWriter, r *http.Request) {
 	// get all of the story id
@@ -67,16 +69,20 @@ func getStories(w http.ResponseWriter, r *http.Request) {
 	// Not sure this is going to be a necessary step
 	stories := filterStories(ids)
 
-	for i := 0; i < len(stories); i++ {
-		byt, err := json.Marshal(stories[i])
-		if err != nil {
-			panic(err)
-		}
-		// fmt.Println("stories", byt)
-		w.Write(byt)
-	}
+	var s []map[string]interface{}
 
-	// w.Write([]byte(stories))
+	for i := 0; i < len(stories); i++ {
+		s = append(s, stories[i])
+		// fmt.Println("stories", byt)
+	}
+	w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+	w.WriteHeader(http.StatusCreated)
+	// json.NewEncoder(w).Encode(s)
+	byt, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	w.Write(byt)
 }
 
 // GET a single story by id read from url parameter
@@ -88,9 +94,7 @@ func getStory(w http.ResponseWriter, r *http.Request) {
 	storyURL := fmtURL(id)
 	// Make request and get response body
 	data := fmtRes(storyURL)
-
-	fmt.Println("vars", data)
-
+	fmt.Println("data:", data)
 	w.Write([]byte(data))
 }
 
